@@ -622,6 +622,22 @@ a.link:hover {
   color: hsl(var(--steel-2));
 }
 
+.contact-links {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.625rem 1rem;
+  margin: 1.75rem 0;
+}
+.contact-links dt {
+  color: hsl(var(--steel-muted));
+}
+.contact-links dd {
+  margin: 0;
+}
+.contact-links a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
 .markdown .about-note {
   margin-top: 2rem;
   padding-top: 1rem;
