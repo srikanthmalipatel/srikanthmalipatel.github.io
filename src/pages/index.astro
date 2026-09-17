@@ -8,25 +8,13 @@ posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 const recent = posts.slice(0, 5);
 const fmtDate = (d: Date) =>
   d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit" });
-const latest = posts[0]?.data.date;
 ---
 
 <Base
   title="inference lab"
-  description="A working log of serving LLMs on real hardware — measured from first principles."
+  description="Notes and experiments on inference engineering, language model serving, and GPU performance."
 >
-  <!-- Hero: powered panel + HUD corner brackets. -->
-  <section
-    class="panel panel-signal"
-    style="position:relative;margin-bottom:2.5rem"
-  >
-    <span class="hud-bracket tl"></span>
-    <span class="hud-bracket br"></span>
-
-    <span class="chip-signal" style="margin-bottom:1rem">
-      <span class="led" style="color:hsl(var(--ok))"></span>status // live
-    </span>
-
+  <section style="margin-bottom:3rem">
     <h1
       style="font-family:var(--font-sans);font-weight:700;font-size:2.75rem;line-height:1.05;letter-spacing:-0.03em;margin:0 0 1rem;color:hsl(var(--steel))"
     >
@@ -34,45 +22,16 @@ const latest = posts[0]?.data.date;
     </h1>
 
     <p
-      style="color:hsl(var(--steel-2));font-size:0.9375rem;line-height:1.7;margin:0 0 1.75rem;max-width:66ch"
+      style="color:hsl(var(--steel-2));font-size:0.9375rem;line-height:1.7;margin:0;max-width:66ch"
     >
-      A working log of serving language models on real hardware. Rooflines by
-      hand, throughput measured under steady-state load, and the failure modes
-      that show up when the KV cache runs out. First principles, then numbers.
+      Notes and experiments on inference engineering. I explore how language
+      models run on GPUs and what affects their performance.
     </p>
-
-    <!-- Truthful telemetry: nothing here is fabricated. -->
-    <div style="max-width:34rem">
-      <div class="data-row">
-        <span class="k">build</span>
-        <span class="v" style="color:hsl(var(--ok))">live</span>
-      </div>
-      <div class="data-row">
-        <span class="k">rig</span>
-        <span class="v">g5.2xlarge · A10G · 24GB</span>
-      </div>
-      <div class="data-row">
-        <span class="k">control</span>
-        <span class="v">Qwen3-8B</span>
-      </div>
-      <div class="data-row">
-        <span class="k">reports</span>
-        <span class="v">{String(posts.length).padStart(2, "0")}</span>
-      </div>
-      {
-        latest && (
-          <div class="data-row">
-            <span class="k">last log</span>
-            <span class="v">{fmtDate(latest)}</span>
-          </div>
-        )
-      }
-    </div>
   </section>
 
   <section>
     <div class="section-head">
-      <span class="label-sys">▸ recent field reports</span>
+      <span class="label-sys">Recent posts</span>
       <a href="/posts/" class="section-action">all posts →</a>
     </div>
 
@@ -99,8 +58,5 @@ const latest = posts[0]?.data.date;
       }
     </ol>
 
-    <div style="margin-top:1.5rem">
-      <a href="/posts/" class="btn btn-primary">all posts</a>
-    </div>
   </section>
 </Base>
