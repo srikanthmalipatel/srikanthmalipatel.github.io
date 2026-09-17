@@ -622,6 +622,57 @@ a.link:hover {
   color: hsl(var(--steel-2));
 }
 
+.page-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin: 0 0 1.5rem;
+}
+.post-search {
+  max-width: 28rem;
+  margin-bottom: 2rem;
+}
+.post-search .input {
+  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  padding: 0.65rem 0.75rem;
+}
+.post-archive {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.archive-entry {
+  border-top: 1px solid hsl(var(--hull));
+  padding: 1.5rem 0;
+}
+.archive-entry time {
+  color: hsl(var(--steel-muted));
+}
+.archive-entry h2 {
+  font-size: 1.1875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0.5rem 0;
+}
+.archive-entry p {
+  max-width: 72ch;
+  color: hsl(var(--steel-2));
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  margin: 0;
+}
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.875rem;
+}
+.search-empty {
+  color: hsl(var(--steel-muted));
+  font-size: 0.9375rem;
+}
 .contact-links {
   display: grid;
   grid-template-columns: 5rem minmax(0, 1fr);

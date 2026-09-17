@@ -1,293 +1,67 @@
 ---
 import { getCollection } from "astro:content";
 import Base from "../../layouts/Base.astro";
-import TypeBadge from "../../components/TypeBadge.astro";
 
-const all = (await getCollection("posts")).filter((p) => !p.data.draft);
-all.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
-
-const fmtDate = (d: Date) =>
-  d.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-  });
-const year = (d: Date) => String(d.getFullYear());
-
-// Facet counts
-const countBy = (vals: string[]) => {
-  const m = new Map<string, number>();
-  for (const v of vals) m.set(v, (m.get(v) ?? 0) + 1);
-  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-};
-const topicCounts = countBy(all.flatMap((p) => p.data.topics));
-const typeCounts = countBy(all.map((p) => p.data.type));
-const yearCounts = countBy(all.map((p) => year(p.data.date))).sort(
-  (a, b) => Number(b[0]) - Number(a[0]),
-);
-const authorCounts = countBy(all.map((p) => p.data.author));
+const posts = (await getCollection("posts")).filter((p) => !p.data.draft);
+posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const fmtDate = (date: Date) => date.toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  timeZone: "UTC",
+});
 ---
 
-<Base title="Blog posts // inference lab" description="Posts from the inference lab.">
-  <div style="margin-bottom:2rem">
-    <span class="label-sys-bright">▸ archive</span>
-    <h1
-      style="font-family:var(--font-sans);font-weight:700;font-size:1.875rem;letter-spacing:-0.025em;text-transform:uppercase;margin:0.375rem 0 0.5rem;color:hsl(var(--steel))"
-    >
-      Blog posts
-    </h1>
-    <p style="color:hsl(var(--steel-muted));margin:0;font-size:0.9375rem">
-      Notes from serving models on real hardware — measured, not hand-waved
-    </p>
-    <p class="label-sys" style="margin-top:0.75rem">
-      <span id="count-shown" class="data" style="color:hsl(var(--signal))">{all.length}</span> posts shown
-    </p>
+<Base title="Posts // inference lab" description="Notes and experiments on inference engineering.">
+  <h1 class="page-title">Posts</h1>
+
+  <div class="post-search">
+    <label for="post-search" class="label-sys">Search posts</label>
+    <input
+      id="post-search"
+      class="input"
+      type="search"
+      placeholder="Search by title or topic"
+      aria-controls="post-list"
+    />
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr;gap:1.5rem">
-    <!-- Filter panel -->
-    <section class="panel" aria-label="Filters">
-      <div class="label-sys" style="margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem">
-        <span class="led" style="color:hsl(var(--signal))"></span>query // filter
-      </div>
-      <div
-        style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem"
+  <ol id="post-list" class="post-archive">
+    {posts.map((post) => (
+      <li
+        class="archive-entry"
+        data-search={[post.data.title, post.data.summary, ...post.data.topics, ...post.data.tags].join(" ").toLowerCase()}
       >
-        <div>
-          <label class="label-sys" for="f-keyword">keyword</label>
-          <input
-            id="f-keyword"
-            class="input"
-            type="search"
-            placeholder="search title, summary, tags..."
-            style="margin-top:0.375rem"
-          />
+        <time datetime={post.data.date.toISOString().slice(0, 10)} class="data">
+          {fmtDate(post.data.date)}
+        </time>
+        <h2><a href={`/posts/${post.id}/`} class="link">{post.data.title}</a></h2>
+        <p>{post.data.summary}</p>
+        <div class="post-tags">
+          {post.data.tags.map((tag) => (
+            <a href={`/posts/?q=${encodeURIComponent(tag)}`} class="tag-link">#{tag}</a>
+          ))}
         </div>
-        <div>
-          <label class="label-sys" for="f-topic">topic</label>
-          <select id="f-topic" class="input" style="margin-top:0.375rem">
-            <option value="">all topics</option>
-            {
-              topicCounts.map(([t, n]) => (
-                <option value={t}>
-                  {t} ({n})
-                </option>
-              ))
-            }
-          </select>
-        </div>
-        <div>
-          <label class="label-sys" for="f-type">type</label>
-          <select id="f-type" class="input" style="margin-top:0.375rem">
-            <option value="">all types</option>
-            {
-              typeCounts.map(([t, n]) => (
-                <option value={t}>
-                  {t} ({n})
-                </option>
-              ))
-            }
-          </select>
-        </div>
-        <div>
-          <label class="label-sys" for="f-year">year</label>
-          <select id="f-year" class="input" style="margin-top:0.375rem">
-            <option value="">all years</option>
-            {
-              yearCounts.map(([y, n]) => (
-                <option value={y}>
-                  {y} ({n})
-                </option>
-              ))
-            }
-          </select>
-        </div>
-        <div>
-          <label class="label-sys" for="f-author">author</label>
-          <select id="f-author" class="input" style="margin-top:0.375rem">
-            <option value="">all authors</option>
-            {
-              authorCounts.map(([a, n]) => (
-                <option value={a}>
-                  {a} ({n})
-                </option>
-              ))
-            }
-          </select>
-        </div>
-        <div>
-          <label class="label-sys" for="f-order">order</label>
-          <select id="f-order" class="input" style="margin-top:0.375rem">
-            <option value="newest">newest</option>
-            <option value="oldest">oldest</option>
-          </select>
-        </div>
-      </div>
-      <div style="margin-top:1rem">
-        <button id="f-clear" class="btn btn-ghost" type="button">
-          clear filters
-        </button>
-      </div>
-    </section>
+      </li>
+    ))}
+  </ol>
+  <p id="no-match" class="search-empty" role="status" hidden>No posts match your search.</p>
 
-    <!-- Post list -->
-    <section aria-label="Posts">
-      <ol id="post-list" style="list-style:none;margin:0;padding:0">
-        {
-          all.map((p, i) => (
-            <li
-              class="post-row panel panel-interactive"
-              style="margin-bottom:1rem"
-              data-title={p.data.title.toLowerCase()}
-              data-summary={p.data.summary.toLowerCase()}
-              data-topics={p.data.topics.join("|").toLowerCase()}
-              data-tags={p.data.tags.join("|").toLowerCase()}
-              data-type={p.data.type}
-              data-author={p.data.author}
-              data-year={year(p.data.date)}
-              data-date={p.data.date.valueOf()}
-            >
-              <div
-                style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.5rem"
-              >
-                <span class="data" style="color:hsl(var(--signal-soft))">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span class="data" style="color:hsl(var(--steel-muted))">
-                  {fmtDate(p.data.date)}
-                </span>
-                <TypeBadge type={p.data.type} />
-              </div>
-              <h2
-                style="font-family:var(--font-sans);font-weight:600;font-size:1.125rem;margin:0 0 0.5rem;line-height:1.3"
-              >
-                <a href={`/posts/${p.id}/`} class="link">
-                  {p.data.title}
-                </a>
-              </h2>
-              <p
-                style="color:hsl(var(--steel-2));font-size:0.9375rem;line-height:1.6;margin:0 0 0.75rem;max-width:72ch"
-              >
-                {p.data.summary}
-              </p>
-              <div
-                style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap"
-              >
-                <span
-                  class="data"
-                  style="display:flex;flex-wrap:wrap;gap:0.5rem"
-                >
-                  {p.data.tags.map((t) => (
-                    <a
-                      href={`/posts/?q=${encodeURIComponent(t)}`}
-                      class="tag-link"
-                    >
-                      #{t}
-                    </a>
-                  ))}
-                </span>
-                <span class="label-sys">by {p.data.author}</span>
-              </div>
-            </li>
-          ))
-        }
-      </ol>
-      <p
-        id="no-match"
-        class="label-sys"
-        style="display:none;padding:1.5rem 0;color:hsl(var(--steel-muted))"
-      >
-        No posts match this query
-      </p>
-    </section>
-  </div>
-
-  <script is:inline>
-    (function () {
-      const kw = document.getElementById("f-keyword");
-      const topic = document.getElementById("f-topic");
-      const type = document.getElementById("f-type");
-      const yr = document.getElementById("f-year");
-      const author = document.getElementById("f-author");
-      const order = document.getElementById("f-order");
-      const clear = document.getElementById("f-clear");
-      const list = document.getElementById("post-list");
-      const rows = Array.from(document.querySelectorAll(".post-row"));
-      const countEl = document.getElementById("count-shown");
-      const noMatch = document.getElementById("no-match");
-
-      function apply() {
-        const q = kw.value.trim().toLowerCase();
-        const t = topic.value;
-        const ty = type.value;
-        const y = yr.value;
-        const au = author.value;
-        let shown = 0;
-
-        rows.forEach(function (row) {
-          const d = row.dataset;
-          let ok = true;
-          if (q) {
-            const hay =
-              d.title +
-              " " +
-              d.summary +
-              " " +
-              d.topics +
-              " " +
-              d.tags +
-              " " +
-              (d.author || "").toLowerCase() +
-              " " +
-              (d.type || "").toLowerCase();
-            if (hay.indexOf(q) === -1) ok = false;
-          }
-          if (ok && t && d.topics.split("|").indexOf(t.toLowerCase()) === -1)
-            ok = false;
-          if (ok && ty && d.type !== ty) ok = false;
-          if (ok && y && d.year !== y) ok = false;
-          if (ok && au && d.author !== au) ok = false;
-          row.style.display = ok ? "" : "none";
-          if (ok) shown++;
-        });
-
-        // reorder
-        const visible = rows.filter((r) => r.style.display !== "none");
-        visible.sort(function (a, b) {
-          const da = Number(a.dataset.date);
-          const db = Number(b.dataset.date);
-          return order.value === "oldest" ? da - db : db - da;
-        });
-        visible.forEach(function (r, i) {
-          list.appendChild(r);
-          const num = r.querySelector(".data");
-          if (num) num.textContent = String(i + 1).padStart(2, "0");
-        });
-
-        countEl.textContent = String(shown);
-        noMatch.style.display = shown === 0 ? "block" : "none";
+  <script>
+    const search = document.querySelector<HTMLInputElement>("#post-search")!;
+    const entries = [...document.querySelectorAll<HTMLElement>(".archive-entry")];
+    const noMatch = document.querySelector<HTMLElement>("#no-match")!;
+    function filterPosts() {
+      const query = search.value.trim().toLowerCase();
+      let matches = 0;
+      for (const entry of entries) {
+        entry.hidden = !entry.dataset.search!.includes(query);
+        if (!entry.hidden) matches++;
       }
-
-      [kw, topic, type, yr, author, order].forEach(function (el) {
-        el.addEventListener("input", apply);
-        el.addEventListener("change", apply);
-      });
-      clear.addEventListener("click", function () {
-        kw.value = "";
-        topic.value = "";
-        type.value = "";
-        yr.value = "";
-        author.value = "";
-        order.value = "newest";
-        apply();
-      });
-
-      // Seed the keyword box from ?q= so a tag link (from any post or the
-      // list) lands here pre-filtered, with the term visible + clearable.
-      var params = new URLSearchParams(window.location.search);
-      var q = params.get("q");
-      if (q) kw.value = q;
-      apply();
-    })();
+      noMatch.hidden = matches !== 0;
+    }
+    search.value = new URLSearchParams(window.location.search).get("q") ?? "";
+    search.addEventListener("input", filterPosts);
+    filterPosts();
   </script>
 </Base>
