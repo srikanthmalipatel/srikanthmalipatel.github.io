@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Inference lab</title>
+  <rect width="32" height="32" rx="7" fill="#b84600"/>
+  <g fill="#fffaf3">
+    <circle cx="8.5" cy="8.5" r="2.5"/>
+    <path d="M6 14h5v12H6zM16 6h5v15h6v5H16z"/>
+  </g>
+</svg>

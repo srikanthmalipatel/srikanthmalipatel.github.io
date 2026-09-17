@@ -19,6 +19,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="canonical" href={canonical} />
@@ -55,8 +58,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
           class="label-sys"
           style="color:hsl(var(--signal));font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center"
         >
-          <span class="led" style="color:hsl(var(--ok));margin-right:0.5rem"></span
-          >{site}
+          <img src="/favicon.svg" alt="" width="20" height="20" style="margin-right:0.625rem" />
+          {site}
         </a>
         <Nav />
       </header>
