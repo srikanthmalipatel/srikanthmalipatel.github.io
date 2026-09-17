@@ -1,0 +1,645 @@
+@import "tailwindcss";
+
+/* Fonts: content voice = IBM Plex Sans (loaded), telemetry voice = JetBrains Mono (loaded). */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/* ===================================================================
+   BLOG THEME (light)
+   Warm near-white paper with a whisper-level engineering grid; flat
+   sheets mounted with hairline borders + a soft drop shadow (depth from
+   hairlines, not gradients). Dark text, burnt
+   signal orange. Tokens are HSL triplets so `hsl(var(--x) / a)` opacity
+   syntax works throughout.
+   =================================================================== */
+
+:root {
+  /* Warm paper substrate — a peach/cream wall (the reference's paper-photo
+     reads warm across the whole viewport, so the wall carries real warmth,
+     not just a corner tint). Sheets are warm off-white, not clinical white. */
+  --void: 28 32% 90%;          /* gallery wall — warm cream */
+  --plate: 32 44% 98%;         /* mounted sheets — warm off-white */
+  --plate-2: 28 30% 93%;       /* lifted surface (chips, inputs) */
+  --plate-3: 28 26% 89%;       /* hover state */
+  --bevel-hi: 40 60% 100%;     /* top highlight on plates */
+  --bevel-lo: 28 20% 68%;
+  --hull: 28 20% 77%;          /* default hairline border */
+  --hull-2: 28 16% 55%;        /* lifted border */
+  --rail: 28 14% 47%;          /* dividers */
+
+  --steel: 213 27% 12%;        /* dark text on light backgrounds */
+  --steel-2: 0 0% 25%;         /* secondary text */
+  --steel-muted: 0 0% 36%;     /* muted / labels */
+
+  --signal: 23 100% 36%;       /* burnt orange #b84600 — AA on paper */
+  --signal-soft: 23 90% 31%;
+  --signal-glow: 23 100% 44%;
+  --warn: 43 100% 25%;
+  --bad: 348 90% 35%;
+  --ok: 160 100% 19%;
+
+  --void-deep: 28 30% 86%;
+  --plate-deep: 32 40% 97%;
+
+  /* Sheets are flat near-white; a whisper of shadow does the lifting. */
+  --shadow-ground: 0 8px 18px -12px hsl(0 0% 15% / 0.16);
+
+  /* Motion tokens (exponential ease-outs only). */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+}
+
+/* Map tokens into Tailwind's theme so utilities (bg-plate, text-steel, ...)
+   resolve to real colors. Radii are all 0 — square by identity. */
+@theme {
+  --color-void: hsl(var(--void));
+  --color-plate: hsl(var(--plate));
+  --color-plate-2: hsl(var(--plate-2));
+  --color-plate-3: hsl(var(--plate-3));
+  --color-hull: hsl(var(--hull));
+  --color-hull-2: hsl(var(--hull-2));
+  --color-rail: hsl(var(--rail));
+  --color-steel: hsl(var(--steel));
+  --color-steel-2: hsl(var(--steel-2));
+  --color-steel-muted: hsl(var(--steel-muted));
+  --color-signal: hsl(var(--signal));
+  --color-signal-glow: hsl(var(--signal-glow));
+  --color-signal-soft: hsl(var(--signal-soft));
+  --color-warn: hsl(var(--warn));
+  --color-bad: hsl(var(--bad));
+  --color-ok: hsl(var(--ok));
+
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-full: 0px;
+}
+
+html {
+  background: hsl(var(--void));
+  color: hsl(var(--steel));
+  font-family: var(--font-sans);
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: hsl(var(--void));
+  position: relative;
+  font-feature-settings: "kern" 1;
+}
+
+/* -------------------------------------------------------------------
+   Substrate — a faint, airy engineering grid on warm paper with a
+   whisper of signal warmth up top. Pointer-events off; never competes.
+   ------------------------------------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse 90% 55% at 72% -8%, hsl(var(--signal) / 0.06), transparent 62%),
+    linear-gradient(hsl(var(--hull) / 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--hull) / 0.14) 1px, transparent 1px);
+  background-size: cover, 56px 56px, 56px 56px;
+  background-position: center, center, center;
+  background-repeat: no-repeat, repeat, repeat;
+}
+
+/* Keep all real content above the substrate. */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: hsl(var(--signal));
+  color: hsl(0 0% 100%);
+}
+
+/* Chassis-matched scrollbars. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: hsl(var(--plate-2));
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--hull-2));
+  border: 2px solid hsl(var(--void));
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--signal-soft));
+}
+
+/* -------------------------------------------------------------------
+   Telemetry voice: mono, uppercase, tracked. Labels / chips / nav.
+   ------------------------------------------------------------------- */
+.label-sys {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(var(--steel-muted));
+}
+.label-sys-bright {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(var(--signal));
+}
+
+.data {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------
+   Panel — a mounted sheet. Flat near-white, 14px chamfered top-right
+   corner, hairline border, a top highlight + soft ground shadow, and a
+   faint orange hot-wire seam across the top edge.
+   ------------------------------------------------------------------- */
+.panel {
+  position: relative;
+  background: hsl(var(--plate));
+  border: 1px solid hsl(var(--hull));
+  padding: 1.5rem;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--bevel-hi) / 0.8),
+    var(--shadow-ground);
+  transition:
+    border-color var(--dur-base) var(--ease-out-quart),
+    box-shadow var(--dur-base) var(--ease-out-quart);
+}
+
+/* Hot-wire seam: a signal thread fading in/out across the top edge. */
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    hsl(var(--signal) / 0.3) 20%,
+    hsl(var(--signal) / 0.5) 50%,
+    hsl(var(--signal) / 0.2) 80%,
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.panel:hover {
+  border-color: hsl(var(--hull-2));
+}
+
+/* Interactive card: signal border + soft signal shadow + 1px lift. */
+.panel-interactive {
+  transition:
+    border-color var(--dur-base) var(--ease-out-quart),
+    box-shadow var(--dur-base) var(--ease-out-quart),
+    transform var(--dur-base) var(--ease-out-quart);
+}
+.panel-interactive:hover {
+  border-color: hsl(var(--signal) / 0.55);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--bevel-hi) / 0.8),
+    0 0 0 1px hsl(var(--signal) / 0.15),
+    0 14px 28px -16px hsl(var(--signal) / 0.3);
+  transform: translateY(-1px);
+}
+.panel-interactive:hover::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    hsl(var(--signal) / 0.6) 20%,
+    hsl(var(--signal)) 50%,
+    hsl(var(--signal) / 0.5) 80%,
+    transparent
+  );
+}
+
+/* Featured panel — clean paper with a deeper ground lift (no orange wash
+   on light: emphasis comes from the solid chip-signal eyebrow + shadow). */
+.panel-signal {
+  border-color: hsl(var(--hull));
+  box-shadow:
+    inset 0 1px 0 hsl(var(--bevel-hi) / 0.9),
+    0 20px 40px -18px hsl(0 0% 15% / 0.28);
+}
+
+/* HUD corner brackets as standalone spans, so a .panel (which uses ::before
+   for its seam) can still get L-marks without pseudo-element collision.
+   Place two spans inside a `position:relative` panel. */
+.hud-bracket {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid hsl(var(--signal));
+  pointer-events: none;
+  z-index: 2;
+}
+.hud-bracket.tl {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+.hud-bracket.br {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
+/* -------------------------------------------------------------------
+   Buttons — all square. Ghost is the dominant in-app button.
+   ------------------------------------------------------------------- */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  user-select: none;
+  text-decoration: none;
+}
+.btn-primary {
+  background: hsl(var(--signal));
+  color: hsl(0 0% 100%);
+  padding: 10px 20px;
+  border-color: hsl(var(--signal));
+}
+.btn-primary:hover {
+  background: hsl(var(--signal-glow));
+  border-color: hsl(var(--signal-glow));
+}
+.btn-ghost {
+  background: hsl(var(--plate));
+  color: hsl(var(--steel-muted));
+  border-color: hsl(var(--hull-2));
+  padding: 8px 16px;
+}
+.btn-ghost:hover {
+  color: hsl(var(--signal));
+  border-color: hsl(var(--signal));
+}
+
+/* -------------------------------------------------------------------
+   Chips / type badges.
+   ------------------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(var(--steel-muted));
+  background: hsl(var(--plate-2));
+  border: 1px solid hsl(var(--hull));
+  padding: 3px 8px;
+}
+
+/* Signal eyebrow chip — a solid burnt-signal chip with paper text. */
+.chip-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  background: hsl(var(--signal));
+  border: 1px solid hsl(var(--signal));
+  color: hsl(0 0% 100%);
+}
+
+/* -------------------------------------------------------------------
+   Inputs — plate bg, hull border, square, signal focus ring.
+   ------------------------------------------------------------------- */
+.input {
+  background: hsl(var(--plate));
+  border: 1px solid hsl(var(--hull-2));
+  color: hsl(var(--steel));
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 8px 10px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input::placeholder {
+  color: hsl(var(--steel-muted));
+}
+.input:focus {
+  border-color: hsl(var(--signal));
+  box-shadow: 0 0 0 1px hsl(var(--signal));
+}
+select.input {
+  cursor: pointer;
+}
+
+/* -------------------------------------------------------------------
+   LED dots — 6px round currentColor dot with a soft bloom + paper ring.
+   Stays ROUND (the one radius exception; chassis is square, LEDs are not).
+   ------------------------------------------------------------------- */
+.led {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 5px 0 currentColor, 0 0 0 2px hsl(var(--plate));
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------
+   Data rows — [LABEL] :: value two-column mono grid w/ hull dividers.
+   ------------------------------------------------------------------- */
+.data-row {
+  display: grid;
+  grid-template-columns: minmax(0, 7rem) 1fr;
+  gap: 1rem;
+  align-items: baseline;
+  padding-block: 0.4rem;
+  border-bottom: 1px solid hsl(var(--hull) / 0.7);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.data-row:last-child {
+  border-bottom: none;
+}
+.data-row .k {
+  color: hsl(var(--steel-muted));
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.data-row .v {
+  color: hsl(var(--steel-2));
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section header: bordered divider + label + optional action link. */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid hsl(var(--hull));
+}
+.section-action {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--steel-muted));
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+.section-action:hover {
+  color: hsl(var(--signal));
+}
+
+/* -------------------------------------------------------------------
+   Nav: mono uppercase tracked links, active in signal.
+   ------------------------------------------------------------------- */
+.nav-link {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--steel-2));
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+.nav-link:hover {
+  color: hsl(var(--signal));
+}
+.nav-link[aria-current="page"] {
+  color: hsl(var(--signal));
+}
+
+/* Content links. */
+a.link {
+  color: hsl(var(--signal));
+  text-decoration: none;
+}
+a.link:hover {
+  color: hsl(var(--signal-glow));
+  text-decoration: underline;
+}
+
+/* Tag links — clickable mono chips that filter the posts list by keyword.
+   Bordered box reads as interactive; hover fills with signal so it's
+   unmistakably a button. */
+.tag-link {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  color: hsl(var(--signal));
+  background: hsl(var(--signal) / 0.08);
+  border: 1px solid hsl(var(--signal) / 0.45);
+  padding: 2px 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.tag-link:hover,
+.tag-link:focus-visible {
+  background: hsl(var(--signal));
+  color: hsl(0 0% 100%);
+  border-color: hsl(var(--signal));
+  outline: none;
+}
+
+/* -------------------------------------------------------------------
+   Markdown prose — content voice, capped ~72ch.
+   ------------------------------------------------------------------- */
+.markdown {
+  color: hsl(var(--steel-2));
+  font-size: 0.9375rem;
+  line-height: 1.625;
+}
+.markdown h2 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  color: hsl(var(--steel));
+  margin: 2.5rem 0 1rem;
+  line-height: 1.15;
+  border-bottom: 1px solid hsl(var(--hull));
+  padding-bottom: 0.35rem;
+}
+.markdown h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: hsl(var(--signal));
+  margin: 2rem 0 0.75rem;
+}
+.markdown h4 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--signal));
+  margin: 1.5rem 0 0.5rem;
+}
+.markdown p {
+  margin: 0 0 1.125rem;
+}
+.markdown strong {
+  color: hsl(var(--steel));
+  font-weight: 600;
+}
+.markdown a {
+  color: hsl(var(--signal));
+  text-decoration: none;
+}
+.markdown a:hover {
+  text-decoration: underline;
+}
+.markdown ul,
+.markdown ol {
+  margin: 0 0 1.125rem;
+  padding-left: 1.5rem;
+}
+.markdown ul {
+  list-style: none;
+  padding-left: 1.25rem;
+}
+.markdown ul > li {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+.markdown ul > li::before {
+  content: "\25B8"; /* ▸ */
+  position: absolute;
+  left: -1.25rem;
+  color: hsl(var(--signal));
+}
+.markdown ol > li {
+  margin-bottom: 0.5rem;
+}
+.markdown ol > li::marker {
+  font-family: var(--font-mono);
+  color: hsl(var(--signal));
+}
+.markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: hsl(var(--signal));
+  background: hsl(var(--plate-2));
+  border: 1px solid hsl(var(--hull));
+  padding: 1px 5px;
+}
+.markdown pre {
+  background: hsl(var(--plate-2));
+  border: 1px solid hsl(var(--hull));
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0 0 1.25rem;
+}
+.markdown pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: hsl(var(--steel-2));
+}
+.markdown hr {
+  margin: 1.4rem 0;
+  border: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0, hsl(var(--signal) / 0.5) 50%, transparent);
+}
+.markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+.markdown th {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+  color: hsl(var(--signal));
+  border: 1px solid hsl(var(--hull));
+  padding: 6px 10px;
+  background: hsl(var(--plate-2));
+}
+.markdown td {
+  border: 1px solid hsl(var(--hull));
+  padding: 6px 10px;
+  font-variant-numeric: tabular-nums;
+}
+.markdown blockquote {
+  border-left: 2px solid hsl(var(--signal) / 0.6);
+  background: hsl(var(--plate-2) / 0.5);
+  padding: 0.4rem 1rem;
+  margin: 0 0 1.25rem;
+  color: hsl(var(--steel-2));
+}
+
+.markdown .about-note {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--hull));
+  font-size: 0.8125rem;
+  color: hsl(var(--steel-muted));
+}
+.markdown a {
+  overflow-wrap: anywhere;
+}
+
+/* Respect reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,274 @@
+---
+// Inline SVG line chart. Renders from data arrays at build time.
+// Theme-aware: axes/gridlines use currentColor (steel), line uses --signal.
+// No rounded elements; mono tick labels with tabular-nums.
+interface Point {
+  x: number;
+  y: number;
+}
+interface Props {
+  data: Point[];
+  xLabel: string;
+  yLabel: string;
+  caption?: string;
+  markX?: number; // concurrency value to highlight (e.g. peak)
+  markLabel?: string;
+}
+const { data, xLabel, yLabel, caption, markX, markLabel } = Astro.props;
+
+// viewBox geometry
+const W = 720;
+const H = 360;
+const padL = 64;
+const padR = 24;
+const padT = 24;
+const padB = 52;
+const plotW = W - padL - padR;
+const plotH = H - padT - padB;
+
+const xs = data.map((d) => d.x);
+const ys = data.map((d) => d.y);
+const xMin = Math.min(...xs);
+const xMax = Math.max(...xs);
+const yMin = 0;
+const yMax = Math.max(...ys) * 1.08;
+
+const sx = (x: number) => padL + ((x - xMin) / (xMax - xMin)) * plotW;
+const sy = (y: number) => padT + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
+
+// Screen-space points, sorted by x (data may include near-duplicate x's).
+const pts = data
+  .map((d) => ({ x: sx(d.x), y: sy(d.y) }))
+  .sort((a, b) => a.x - b.x);
+
+// Monotone-cubic spline (d3.curveMonotoneX): a smooth curve through the
+// points whose segment slopes are clamped so the interpolant never
+// overshoots the data — the peak at 128 stays a true peak, and dense
+// near-duplicate x's no longer read as sharp notches.
+function monotonePath(p: { x: number; y: number }[]): string {
+  const n = p.length;
+  if (n < 2) return n === 1 ? `M${p[0].x},${p[0].y}` : "";
+
+  // Secant slopes between consecutive points.
+  const dx: number[] = [];
+  const slope: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = p[i + 1].x - p[i].x || 1e-6;
+    dx.push(h);
+    slope.push((p[i + 1].y - p[i].y) / h);
+  }
+
+  // Tangents m[i]; interior points use the Fritsch–Carlson rule so the
+  // curve stays monotone within each interval (no overshoot).
+  const m: number[] = new Array(n);
+  m[0] = slope[0];
+  m[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) {
+      m[i] = 0; // local extremum → flat tangent
+    } else {
+      const w1 = 2 * dx[i] + dx[i - 1];
+      const w2 = dx[i] + 2 * dx[i - 1];
+      m[i] = (w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]);
+    }
+  }
+
+  // Emit cubic Béziers with control points from the tangents.
+  let d = `M${p[0].x.toFixed(2)},${p[0].y.toFixed(2)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i];
+    const c1x = p[i].x + h / 3;
+    const c1y = p[i].y + (m[i] * h) / 3;
+    const c2x = p[i + 1].x - h / 3;
+    const c2y = p[i + 1].y - (m[i + 1] * h) / 3;
+    d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p[i + 1].x.toFixed(2)},${p[i + 1].y.toFixed(2)}`;
+  }
+  return d;
+}
+
+const linePath = monotonePath(pts);
+
+// Y gridlines: 5 ticks
+const yTicks = Array.from({ length: 5 }, (_, i) => (yMax / 4) * i);
+// X ticks: a readable subset
+const xTickVals = [1, 32, 64, 96, 128, 160, 192, 224, 256].filter(
+  (v) => v >= xMin && v <= xMax,
+);
+
+const markPoint = markX != null ? data.find((d) => d.x === markX) : undefined;
+---
+
+<figure class="my-8">
+  <svg
+    viewBox={`0 0 ${W} ${H}`}
+    role="img"
+    aria-label={caption ?? `${yLabel} versus ${xLabel}`}
+    style="width:100%;height:auto;color:hsl(var(--steel-muted))"
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <!-- y gridlines + labels -->
+    {
+      yTicks.map((t) => (
+        <g>
+          <line
+            x1={padL}
+            y1={sy(t)}
+            x2={W - padR}
+            y2={sy(t)}
+            stroke="hsl(var(--hull))"
+            stroke-width="1"
+          />
+          <text
+            x={padL - 10}
+            y={sy(t) + 3}
+            text-anchor="end"
+            font-family="var(--font-mono)"
+            font-size="10"
+            fill="hsl(var(--steel-muted))"
+            style="font-variant-numeric:tabular-nums"
+          >
+            {Math.round(t)}
+          </text>
+        </g>
+      ))
+    }
+
+    <!-- x axis line -->
+    <line
+      x1={padL}
+      y1={padT + plotH}
+      x2={W - padR}
+      y2={padT + plotH}
+      stroke="hsl(var(--hull-2))"
+      stroke-width="1"
+    />
+    <!-- y axis line -->
+    <line
+      x1={padL}
+      y1={padT}
+      x2={padL}
+      y2={padT + plotH}
+      stroke="hsl(var(--hull-2))"
+      stroke-width="1"
+    />
+
+    <!-- x ticks + labels -->
+    {
+      xTickVals.map((v) => (
+        <g>
+          <line
+            x1={sx(v)}
+            y1={padT + plotH}
+            x2={sx(v)}
+            y2={padT + plotH + 5}
+            stroke="hsl(var(--hull-2))"
+            stroke-width="1"
+          />
+          <text
+            x={sx(v)}
+            y={padT + plotH + 18}
+            text-anchor="middle"
+            font-family="var(--font-mono)"
+            font-size="10"
+            fill="hsl(var(--steel-muted))"
+            style="font-variant-numeric:tabular-nums"
+          >
+            {v}
+          </text>
+        </g>
+      ))
+    }
+
+    <!-- the data line: signal orange, rounded joins so dense clusters read
+         as a smooth curve rather than a lumpy polyline -->
+    <path
+      d={linePath}
+      fill="none"
+      stroke="hsl(var(--signal))"
+      stroke-width="1.75"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
+    <!-- data points: small dots, subtle so the line stays the hero -->
+    {
+      data.map((d) => (
+        <circle
+          cx={sx(d.x)}
+          cy={sy(d.y)}
+          r="1.6"
+          fill="hsl(var(--signal))"
+        />
+      ))
+    }
+
+    <!-- peak marker -->
+    {
+      markPoint && (
+        <g>
+          <line
+            x1={sx(markPoint.x)}
+            y1={padT}
+            x2={sx(markPoint.x)}
+            y2={padT + plotH}
+            stroke="hsl(var(--signal))"
+            stroke-width="1"
+            stroke-dasharray="3 3"
+            opacity="0.6"
+          />
+          <rect
+            x={sx(markPoint.x) - 4}
+            y={sy(markPoint.y) - 4}
+            width="8"
+            height="8"
+            fill="none"
+            stroke="hsl(var(--signal))"
+            stroke-width="1.5"
+          />
+          <text
+            x={sx(markPoint.x)}
+            y={sy(markPoint.y) - 12}
+            text-anchor="middle"
+            font-family="var(--font-mono)"
+            font-size="11"
+            fill="hsl(var(--signal))"
+            style="font-variant-numeric:tabular-nums"
+          >
+            {markLabel ?? `${markPoint.y}`}
+          </text>
+        </g>
+      )
+    }
+
+    <!-- axis titles -->
+    <text
+      x={padL + plotW / 2}
+      y={H - 6}
+      text-anchor="middle"
+      font-family="var(--font-mono)"
+      font-size="10"
+      letter-spacing="0.14em"
+      fill="hsl(var(--steel-muted))"
+    >
+      {xLabel.toUpperCase()}
+    </text>
+    <text
+      x={16}
+      y={padT + plotH / 2}
+      text-anchor="middle"
+      font-family="var(--font-mono)"
+      font-size="10"
+      letter-spacing="0.14em"
+      fill="hsl(var(--steel-muted))"
+      transform={`rotate(-90 16 ${padT + plotH / 2})`}
+    >
+      {yLabel.toUpperCase()}
+    </text>
+  </svg>
+  {
+    caption && (
+      <figcaption class="label-sys" style="margin-top:0.5rem;text-align:center">
+        {caption}
+      </figcaption>
+    )
+  }
+</figure>

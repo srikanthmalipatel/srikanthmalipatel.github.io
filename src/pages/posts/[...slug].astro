@@ -1,0 +1,65 @@
+---
+import { getCollection, render } from "astro:content";
+import Base from "../../layouts/Base.astro";
+
+export async function getStaticPaths() {
+  const posts = (await getCollection("posts")).filter((p) => !p.data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const d = post.data;
+const fmtDate = d.date.toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+});
+---
+
+<Base title={`${d.title} // inference lab`} description={d.summary}>
+  <article style="max-width:44rem">
+    <header style="margin-bottom:2.5rem;padding-bottom:1.5rem;border-bottom:1px solid hsl(var(--hull))">
+      <span class="chip-signal" style="margin-bottom:1.25rem">
+        <span class="led" style="color:currentColor"></span>{d.type}
+      </span>
+      <h1
+        style="font-family:var(--font-sans);font-weight:700;font-size:2.5rem;line-height:1.08;letter-spacing:-0.03em;margin:0 0 1.25rem;color:hsl(var(--steel))"
+      >
+        {d.title}
+      </h1>
+      <div style="max-width:34rem;margin-bottom:1.25rem">
+        <div class="data-row">
+          <span class="k">date</span>
+          <span class="v">{fmtDate}</span>
+        </div>
+        <div class="data-row">
+          <span class="k">author</span>
+          <span class="v">{d.author}</span>
+        </div>
+        <div class="data-row">
+          <span class="k">tags</span>
+          <span class="v" style="display:flex;flex-wrap:wrap;gap:0.5rem">
+            {
+              d.tags.map((t) => (
+                <a href={`/posts/?q=${encodeURIComponent(t)}`} class="tag-link">
+                  #{t}
+                </a>
+              ))
+            }
+          </span>
+        </div>
+      </div>
+    </header>
+    <div class="markdown">
+      <Content />
+    </div>
+  </article>
+
+  <div style="margin-top:3rem">
+    <a href="/posts/" class="btn btn-ghost">back to posts</a>
+  </div>
+</Base>

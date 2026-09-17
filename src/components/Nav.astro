@@ -1,0 +1,25 @@
+---
+// Primary pages.
+const path = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === "/" ? path === "/" : path.startsWith(href);
+const items = [
+  { href: "/", label: "home" },
+  { href: "/about/", label: "about" },
+  { href: "/posts/", label: "posts" },
+];
+---
+
+<nav class="flex items-center gap-4" style="flex-wrap:wrap">
+  {
+    items.map((it) => (
+      <a
+        href={it.href}
+        class="nav-link"
+        aria-current={isActive(it.href) ? "page" : undefined}
+      >
+        [{it.label}]
+      </a>
+    ))
+  }
+</nav>

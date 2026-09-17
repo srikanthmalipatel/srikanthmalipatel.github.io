@@ -1,0 +1,10 @@
+---
+interface Props {
+  type: string;
+}
+const { type } = Astro.props;
+---
+
+<span class="chip">
+  <span class="led" style="color:hsl(var(--signal))"></span>{type}
+</span>

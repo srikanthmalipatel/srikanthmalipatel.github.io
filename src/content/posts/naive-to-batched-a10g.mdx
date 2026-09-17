@@ -1,0 +1,322 @@
+---
+title: "Decode is memory-bound: estimating and benchmarking LLM throughput by hand"
+date: 2026-08-29
+type: "Field Report"
+topics: ["Inference", "LLMs", "GPU"]
+tags: ["inference", "vllm", "a10g", "batching", "roofline", "kv-cache"]
+author: "Srikanth Malipatel"
+summary: "A first-principles walkthrough of how to predict LLM decode throughput with simple math, then benchmark to prove it. Why decode is memory-bound, how to size the KV cache, and why batching helps until the cache runs out."
+---
+
+import LineChart from "../../components/LineChart.astro";
+
+If you are new to inference engineering, the most useful skill to build early is
+this. Estimate the performance of a serving setup by hand, then benchmark it to
+check whether you were right. The point is not the number. The point is a mental
+model of what limits the system and why.
+
+This post walks that loop end to end on one example. We predict how many tokens
+per second a single GPU should generate, work out why that ceiling exists, then
+measure it and see the prediction hold. Then we turn on batching, watch
+throughput climb 50x, and predict where it stops climbing and why.
+
+The hardware is an A10G and the model is Qwen3-8B. Both are just the example. The
+method is the point. Put your own numbers into the same formulas and the
+reasoning is the same.
+
+## The setup
+
+The question is narrow. How many tokens per second should this setup generate
+during decode, and what sets that ceiling?
+
+Decode is the token-by-token generation phase. It is the part after the prompt
+has been read. That first phase is called prefill, and it behaves differently,
+so we set it aside and look only at decode. Decode is what dominates wall-clock
+time when a model is answering, so it is the right thing to reason about first.
+
+Every formula below needs a few numbers about the hardware and the model. Here
+they are in one place, so the math later has all its inputs.
+
+```
+HARDWARE // NVIDIA A10G
+  memory bandwidth   ~600 GB/s     how fast we can read HBM
+  memory (HBM)       24 GB         total room for weights + KV cache
+
+MODEL // Qwen3-8B (bf16)
+  weights            ~16 GB        8B parameters x 2 bytes each
+```
+
+Where each number is used. Bandwidth sets how fast weights stream out of HBM,
+which sets the decode ceiling. Memory minus the weights is what is left for the
+KV cache. The model facts come from the model's `config.json`, and the hardware
+facts come from the GPU's spec sheet. bf16 means every weight is 2 bytes, so
+about 8 billion parameters take about 16 GB. That fits in 24 GB with room to
+spare for a KV cache. No tensor parallelism, no quantization, no tricks. One
+card, one model that fits on it.
+
+## The prediction, by hand
+
+### Why decode is memory-bound
+
+To generate one token, the GPU must read every weight in the model at least
+once. A forward pass touches all 16 GB of weights, and there is no way around
+that.
+
+Here is the part that is easy to miss. Those weights cannot stay on the chip
+between tokens. The GPU's fast on-chip memory (registers, shared memory, L2
+cache) is only tens of megabytes. There is nowhere to hold 16 GB. So the weights
+live in HBM, the high-bandwidth memory on the card, and every decode step streams
+the full 16 GB across the memory bus into the compute units, uses each weight for
+a couple of math operations, and drops it to make room for the next one.
+
+That is why decode is memory-bound. The GPU is not short on math. It is waiting
+for weights to arrive over the bus. The bottleneck is bandwidth, not compute.
+
+### Time per token, from bytes and bandwidth
+
+If every token needs a read of 16 GB, and the bus moves 600 GB/s, then time per
+token has a hard floor.
+
+```
+time per token  >=  model bytes / memory bandwidth
+                 =  16 GB / 600 GB/s
+                 ~= 27 ms per token
+```
+
+Invert it to get the ceiling in the units we care about.
+
+```
+tokens per second  <=  1 / 27 ms  ~=  37 tokens/sec
+```
+
+That is the prediction for a single stream, meaning one request at a time, batch
+size 1. About 37 tokens/sec, set by how fast we can read the weights. Compute
+barely matters here, and the next part shows why.
+
+### How much room is left for the KV cache
+
+The weights are not the only thing in HBM. Each active request also stores a KV
+cache. This is the keys and values from attention for every token the request
+has seen so far, kept around so the model does not recompute them on every step.
+The KV cache is what makes decode fast, but it takes space, and that space is
+finite.
+
+One token of KV cache has a fixed cost that comes straight from the model
+architecture.
+
+```
+per-token KV = 2 tensors (K and V) x layers x kv_heads x head_dim x bytes
+```
+
+Multiply that per-token cost by every token held live across every request, and
+it has to fit in whatever HBM is left after the weights. When the server starts,
+vLLM computes this and prints the result. On this setup it reported a KV budget
+of 22,960 tokens. That is the total live context the server can hold across all
+requests at once.
+
+Hold onto that number. It is a different kind of ceiling. Not speed, but
+capacity. It is what bites us later.
+
+### Which ceiling binds first
+
+We now have enough to reason about the whole system. There are three separate
+limits, and predicting performance means working out which one the system hits
+first.
+
+- Memory, or bandwidth. Reading 16 GB per token gives about 37 tokens/sec for a
+  single stream. This binds at batch 1.
+- Compute. The roofline has a ridge point where a kernel stops being
+  memory-bound and starts being compute-bound. On the A10G that ridge sits
+  around 208 FLOP per byte. At batch 1 our arithmetic intensity is about 1 FLOP
+  per byte, one read and a couple of math operations. We are far below the ridge,
+  so we are well below the ridge, memory-bound, and compute is nearly free.
+- KV capacity. About 22,960 tokens of total live context, shared across every
+  in-flight request.
+
+The single-stream ceiling is set by memory. Batching attacks that by sharing the
+weight-read across many requests, which raises arithmetic intensity toward the
+ridge. The question that decides the peak is whether we reach the compute ridge
+or run out of KV cache first. Keep both numbers in view, 208 FLOP per byte and
+22,960 tokens, because the answer is the point of the whole post.
+
+## Single-stream: benchmark and validate
+
+With the prediction in hand, we test it. Run one request at a time and measure
+decode throughput.
+
+The meter reads 29.2 tokens/sec, about 79% of the 37 we predicted.
+
+That gap is not a mistake in the model. It is the difference between spec-sheet
+bandwidth and what a real kernel actually gets. Real memory never delivers its
+rated number, and about 80% efficiency is normal for this class of part. If we
+had predicted 37 and measured 5, the mental model would be wrong and we would go
+looking for the reason. Measuring 29 against a predicted 37 confirms it.
+Single-stream decode is bandwidth-bound, and the ceiling is set by how fast we
+stream the weights.
+
+This is the loop doing its job. The hand estimate said what to expect and why.
+The benchmark said the estimate was sound.
+
+## Batching breaks the ceiling: benchmark and validate
+
+Here is the lever. That 16 GB weight-read is the expensive part, and it does not
+get more expensive when more requests are in flight. If eight requests are all
+decoding at once, one read of the weights produces a token for all eight. The
+fixed cost is shared across the batch.
+
+In roofline terms, batching raises arithmetic intensity. At batch 1 we read
+16 GB to do a small amount of math, about 1 FLOP per byte. At batch B we still
+read 16 GB of weights but do about B times the math, so intensity climbs with
+batch size and moves us from the memory-bound floor toward the compute ridge.
+
+So throughput should climb steeply with concurrency, until it hits one of the
+other ceilings. Let us sweep concurrency from 1 to 256 and watch.
+
+<LineChart
+  data={[
+    { x: 1, y: 29.2 },
+    { x: 4, y: 93.7 },
+    { x: 8, y: 214.3 },
+    { x: 16, y: 314.8 },
+    { x: 32, y: 599.8 },
+    { x: 33, y: 572.4 },
+    { x: 42, y: 704.8 },
+    { x: 44, y: 735.7 },
+    { x: 48, y: 795.1 },
+    { x: 54, y: 876.4 },
+    { x: 58, y: 922.5 },
+    { x: 64, y: 1003.7 },
+    { x: 96, y: 1200.2 },
+    { x: 128, y: 1456.1 },
+    { x: 160, y: 1230.7 },
+    { x: 192, y: 1305.2 },
+    { x: 224, y: 1146.4 },
+    { x: 256, y: 1045.5 },
+  ]}
+  xLabel="concurrency"
+  yLabel="output tok/s"
+  markX={128}
+  markLabel="peak 1456"
+  caption="Chart 1 // output throughput vs concurrency (run-001)"
+/>
+
+Peak is 1456 tokens/sec at concurrency 128, a clean 50x over the single-stream
+number. Same card, same model, same weights. The only thing that changed is how
+many requests share each weight-read. That is the case for batching in one curve.
+
+Look at the right half. Past 128, throughput does not flatten. It falls. 1231
+tok/s at 160, 1046 at 256. And it is not free to push there. Per-token latency
+more than triples over the same range.
+
+<LineChart
+  data={[
+    { x: 1, y: 34.3 },
+    { x: 4, y: 36.36 },
+    { x: 8, y: 37.38 },
+    { x: 16, y: 39.07 },
+    { x: 32, y: 40.7 },
+    { x: 33, y: 43.91 },
+    { x: 42, y: 45.32 },
+    { x: 44, y: 45.44 },
+    { x: 48, y: 45.86 },
+    { x: 54, y: 46.75 },
+    { x: 58, y: 47.68 },
+    { x: 64, y: 48.34 },
+    { x: 96, y: 54.08 },
+    { x: 128, y: 59.67 },
+    { x: 160, y: 79.3 },
+    { x: 192, y: 98.46 },
+    { x: 224, y: 103.57 },
+    { x: 256, y: 102.81 },
+  ]}
+  xLabel="concurrency"
+  yLabel="TPOT ms"
+  markX={128}
+  markLabel="128"
+  caption="Chart 2 // per-token latency (TPOT) vs concurrency (run-001)"
+/>
+
+### Which ceiling did we hit
+
+Recall the two candidates. The compute ridge at 208, and the KV budget of 22,960
+tokens. If compute were the limit, throughput would keep climbing until the batch
+reached about 208 and then flatten. It peaks at 128 and falls. So it was not
+compute. It was the KV cache, and the math predicts it.
+
+At concurrency 160, each request carries roughly 232 tokens of context, so the
+live demand is larger than the budget.
+
+```
+160 requests x 232 tokens  ~=  37,000 tokens   (KV budget is only 22,960)
+```
+
+The cache cannot hold them all. vLLM responds by preempting. It evicts some
+requests and recomputes them later when room frees up. That recompute is wasted
+work. The GPU already did it, threw it away, and does it again. Throughput falls
+because part of every weight-read now goes to rebuilding state that used to
+exist. Latency rises because evicted requests wait to be let back in.
+
+So the curve is two regimes joined together. On the left, batching shares the
+weight-read and throughput climbs toward the compute ridge. On the right, the KV
+cache overflows and preemption gives the gains back. The peak is where those two
+forces meet. Because 22,960 tokens ran out before the batch reached 208, the KV
+ceiling is the one we hit. We could predict that order from two hand
+calculations, before running anything.
+
+## The subplot: what didn't work
+
+The first attempt at this measurement was wrong, and how it was wrong is worth
+keeping, because valid benchmarking is half the skill this post is about.
+
+The throughput was first measured with a bash loop firing parallel `curl`
+requests. The resulting curve had a confident-looking knee at concurrency 32,
+where throughput seemed to flatten. It was tempting to write that down as the
+answer.
+
+It was an artifact. A shell loop that launches N curls does not hold N requests
+in flight at a steady level. The processes start at different times, finish at
+different times, and the actual concurrency the server sees sags well below the N
+on the x-axis. The batch size being plotted was a number that was never actually
+running. The knee at 32 was measuring launch skew, not the GPU.
+
+The fix was to stop hand-rolling load and use a real steady-state load generator
+(guidellm) that holds concurrency at a constant level and only reports once the
+server has reached steady state. Once that happened, the fake knee vanished and
+the real curve appeared, the smooth climb to 128 shown above.
+
+The lesson is simple. You cannot benchmark serving throughput with a curl loop.
+You need a tool that holds concurrency constant, or you are measuring your own
+shell instead of the system. A prediction is only confirmed if the measurement
+is sound.
+
+## Takeaways
+
+The specific numbers here belong to one card and one model. The method is
+reusable, and it is the real point.
+
+- Estimate before you measure. Model bytes divided by memory bandwidth gives the
+  single-stream decode ceiling. You can work it out from a spec sheet and a
+  `config.json` before you touch a GPU.
+- Decode is memory-bound because weights are re-read every token. On-chip memory
+  is far too small to hold 16 GB, so each step pays a full read across the bus.
+  The bottleneck is bandwidth, not compute.
+- Batching is the main lever. It shares the one expensive weight-read across
+  every in-flight request, which raises arithmetic intensity toward the compute
+  ridge. That is where the 50x comes from.
+- List the ceilings and find which binds first. Memory sets the single-stream
+  floor. The compute ridge near 208 FLOP per byte and the KV budget near 22,960
+  tokens compete to cap batching. Here KV ran out first, so the peak landed near
+  128, not 208, and the hand math predicted that order.
+- Pushing past KV capacity makes throughput worse, rather than flat. Preemption
+  and recompute lose work on both sides. There is a real admission ceiling, and
+  it is computable in advance.
+- Peak throughput and best latency are different operating points. 128 gave the
+  most tokens/sec. A lower concurrency gives better per-token latency. Goodput,
+  meaning throughput under a latency limit, is usually the number that matters in
+  production.
+- Benchmark validly or not at all. Pin concurrency, reach steady state, and do
+  not trust a curl loop. A prediction is only confirmed if the measurement is.
+- Utilization meters can mislead. The %SM and %GMBW numbers from nvitop and
+  nvidia-smi report the percent of time the unit was busy, not the percent of
+  peak. A memory-bound kernel can show high SM utilization and still be starved
+  for bandwidth. Only the roofline tells you memory-bound from compute-bound.
