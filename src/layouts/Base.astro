@@ -5,9 +5,12 @@ import Nav from "../components/Nav.astro";
 interface Props {
   title: string;
   description?: string;
+  type?: "website" | "article";
+  structuredData?: Record<string, unknown>;
 }
-const { title, description } = Astro.props;
+const { title, description, type = "website", structuredData } = Astro.props;
 const site = "inference lab";
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
 ---
 
 <!doctype html>
@@ -18,6 +21,22 @@ const site = "inference lab";
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
+    <link rel="canonical" href={canonical} />
+    <meta property="og:site_name" content={site} />
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={title} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="en_US" />
+    {description && <meta property="og:description" content={description} />}
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    {description && <meta name="twitter:description" content={description} />}
+    {structuredData && (
+      <script
+        type="application/ld+json"
+        set:html={JSON.stringify(structuredData).replace(/</g, "\\u003c")}
+      />
+    )}
     <link
       rel="alternate"
       type="application/rss+xml"

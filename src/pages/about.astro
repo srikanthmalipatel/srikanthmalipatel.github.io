@@ -1,10 +1,24 @@
 ---
 import Base from "../layouts/Base.astro";
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "ProfilePage",
+  mainEntity: {
+    "@type": "Person",
+    name: "Srikanth Malipatel",
+    url: new URL("/about/", Astro.site).href,
+    sameAs: [
+      "https://www.linkedin.com/in/srikk595/",
+      "https://github.com/srikanthmalipatel",
+    ],
+  },
+};
 ---
 
 <Base
   title="About // inference lab"
   description="Srikanth Malipatel is a software engineer interested in distributed systems, machine learning, and inference engineering."
+  structuredData={structuredData}
 >
   <span class="label-sys-bright">About me</span>
   <h1

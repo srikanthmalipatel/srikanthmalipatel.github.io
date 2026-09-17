@@ -19,9 +19,22 @@ const fmtDate = d.date.toLocaleDateString("en-US", {
   day: "2-digit",
   timeZone: "UTC",
 });
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: d.title,
+  description: d.summary,
+  datePublished: d.date.toISOString(),
+  mainEntityOfPage: new URL(Astro.url.pathname, Astro.site).href,
+  author: {
+    "@type": "Person",
+    name: d.author,
+    url: new URL("/about/", Astro.site).href,
+  },
+};
 ---
 
-<Base title={`${d.title} // inference lab`} description={d.summary}>
+<Base title={`${d.title} // inference lab`} description={d.summary} type="article" structuredData={structuredData}>
   <article style="max-width:44rem">
     <header style="margin-bottom:2.5rem;padding-bottom:1.5rem;border-bottom:1px solid hsl(var(--hull))">
       <span class="chip-signal" style="margin-bottom:1.25rem">
