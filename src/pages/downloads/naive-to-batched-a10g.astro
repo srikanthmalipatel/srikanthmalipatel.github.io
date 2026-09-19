@@ -1,0 +1,50 @@
+---
+import Base from "../../layouts/Base.astro";
+
+const files = "/downloads/naive-to-batched-a10g";
+---
+
+<Base
+  title="Download the inference throughput article | Inference lab"
+  description="Download the Markdown article, chart images, and an offline HTML preview of the Qwen3-8B throughput experiment."
+>
+  <article style="max-width:44rem">
+    <p class="label-sys" style="margin-bottom:1rem">Article downloads</p>
+    <h1 style="font-family:var(--font-sans);font-size:2rem;font-weight:700;line-height:1.15;letter-spacing:-0.03em;margin:0 0 1.25rem">
+      Decode is memory-bound: estimating and benchmarking LLM throughput by hand
+    </h1>
+    <p style="color:hsl(var(--steel-2));line-height:1.7;margin-bottom:1.5rem">
+      Take a copy to read, edit, or share. The complete ZIP includes the Markdown
+      article, PNG and SVG charts, and a styled HTML preview that opens offline.
+    </p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem">
+      <a class="btn btn-primary" href={`${files}/naive-to-batched-a10g.zip`} download>
+        Download complete ZIP
+      </a>
+      <a class="btn btn-ghost" href={`${files}/naive-to-batched-a10g.md`} download>
+        Download Markdown
+      </a>
+    </div>
+    <p style="font-size:0.875rem;color:hsl(var(--steel-muted));margin-bottom:2rem">
+      Keep the extracted assets folder beside the Markdown file to display its images.
+    </p>
+
+    <section style="border-top:1px solid hsl(var(--hull));padding-top:1.5rem;margin-bottom:2rem">
+      <h2 style="font-family:var(--font-sans);font-size:1.25rem;font-weight:600;margin:0 0 0.75rem">
+        Styled preview
+      </h2>
+      <p style="color:hsl(var(--steel-2));line-height:1.7;margin-bottom:1rem">
+        The same article with typography and charts styled after More Than a Machine.
+        Fonts and images are embedded in the HTML file.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:0.75rem">
+        <a class="btn btn-ghost" href={`${files}/preview.html`}>Open preview</a>
+        <a class="btn btn-ghost" href={`${files}/preview.html`} download="naive-to-batched-a10g-preview.html">
+          Download HTML
+        </a>
+      </div>
+    </section>
+    <a class="link" href="/posts/naive-to-batched-a10g/">Back to the article →</a>
+  </article>
+</Base>
